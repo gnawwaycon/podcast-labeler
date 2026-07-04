@@ -1,0 +1,12 @@
+# Podcast audio & generated output — never commit personal/copyrighted media
+*.mp3
+labeled/
+edited/
+.podlabel-regions.json
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log*

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>🏊 Podcast Labeler</title>
+<style>
+  :root {
+    --bg: #0e1726;
+    --panel: #16223a;
+    --panel2: #1d2c49;
+    --line: #2a3c5e;
+    --text: #e6edf7;
+    --muted: #8da2c0;
+    --accent: #38bdf8;
+    --accent2: #0ea5e9;
+    --good: #34d399;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.45;
+  }
+  header {
+    padding: 22px 26px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #16223a, #0e1726);
+  }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  main { max-width: 920px; margin: 0 auto; padding: 22px 26px 80px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px; margin-bottom: 18px;
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  select, input[type=range] { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+  .spacer { flex: 1; }
+  button {
+    background: var(--accent); color: #04222f; border: 0; border-radius: 8px;
+    padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  tbody td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; font-size: 14px; }
+  tbody tr:hover { background: var(--panel); }
+  .fname { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--accent); }
+  .editlink { font-size: 11px; color: var(--muted); text-decoration: none; }
+  .editlink:hover { color: var(--bad); }
+  .hint { font-size: 12px; color: var(--muted); margin: -6px 0 16px; }
+  .hint b { color: var(--text); }
+  .admark { font-size: 11px; color: var(--bad); margin-left: 8px; white-space: nowrap; }
+  .say-input { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 7px; padding: 7px 9px; font-size: 13px; }
+  .status { font-size: 12px; white-space: nowrap; }
+  .status.done { color: var(--good); }
+  .status.err { color: var(--bad); }
+  .status.busy { color: var(--accent); }
+  .chk { width: 18px; height: 18px; accent-color: var(--accent); }
+  .badge { font-size: 10px; background: var(--good); color: #042a1c; border-radius: 20px;
+    padding: 1px 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+  .pathline { color: var(--muted); font-size: 12px; margin: 4px 0 16px;
+    font-family: ui-monospace, monospace; word-break: break-all; }
+  .colsel { width: 36px; text-align: center; }
+  .colstatus { width: 110px; }
+
+  .folderbar {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 14px;
+  }
+  .folderbar .fpath { flex: 1; min-width: 0; }
+  .folderbar .fpath .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .folderbar .fpath .val { font-family: ui-monospace, monospace; font-size: 13px; color: var(--text);
+    word-break: break-all; margin-top: 2px; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(4, 9, 18, .7);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    width: min(640px, 92vw); max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal h2 { margin: 0; padding: 16px 18px; font-size: 15px; border-bottom: 1px solid var(--line); }
+  .modal .cur { padding: 10px 18px; font-family: ui-monospace, monospace; font-size: 12px;
+    color: var(--muted); border-bottom: 1px solid var(--line); word-break: break-all; }
+  .modal .dirlist { overflow-y: auto; flex: 1; padding: 6px; }
+  .diritem {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px;
+    cursor: pointer; font-size: 14px;
+  }
+  .diritem:hover { background: var(--panel2); }
+  .diritem .ico { width: 18px; text-align: center; }
+  .diritem .count { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .modal .footer { display: flex; gap: 10px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line); }
+  .modal .footer .hint { flex: 1; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏊 Podcast Labeler</h1>
+  <p>Prepends a spoken episode name to the start of each MP3, so you know what's playing while you swim.</p>
+</header>
+<main>
+  <div class="folderbar">
+    <div class="fpath">
+      <div class="lbl">Podcast folder</div>
+      <div class="val" id="curDir">…</div>
+    </div>
+    <button class="secondary" id="changeDir">📁 Change folder…</button>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Voice</label>
+      <select id="voice"></select>
+    </div>
+    <div class="field">
+      <label>Speed (<span id="rateVal">180</span> wpm)</label>
+      <input type="range" id="rate" min="120" max="260" value="180" step="10" />
+    </div>
+    <div class="spacer"></div>
+    <button class="secondary" id="selAll">Select all</button>
+    <button class="secondary" id="selNone">Select none</button>
+    <button id="processBtn" title="For each selected episode: cut its marked ads, then add the spoken name">⬇︎ Export selected</button>
+  </div>
+  <p class="hint" id="exportHint">Export = remove any marked ads <b>and</b> prepend the spoken episode name, in one step. Mark ads first via “✂️ edit ads”.</p>
+
+  <div class="pathline" id="outdir"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="colsel"><input type="checkbox" class="chk" id="masterChk" /></th>
+        <th>File</th>
+        <th>Spoken announcement (editable)</th>
+        <th class="colstatus">Status</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+
+<div class="modal-backdrop" id="browseModal">
+  <div class="modal">
+    <h2>Choose podcast folder</h2>
+    <div class="cur" id="browseCur"></div>
+    <div class="dirlist" id="browseList"></div>
+    <div class="footer">
+      <span class="hint" id="browseHint"></span>
+      <button class="secondary" id="browseCancel">Cancel</button>
+      <button id="browsePick">Use this folder</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const rowsEl = document.getElementById('rows');
+const voiceEl = document.getElementById('voice');
+const rateEl = document.getElementById('rate');
+const rateVal = document.getElementById('rateVal');
+let files = [];
+let currentDir = '';   // server-resolved absolute path of the active folder
+
+rateEl.addEventListener('input', () => rateVal.textContent = rateEl.value);
+
+async function loadVoices() {
+  const { voices } = await (await fetch('/api/voices')).json();
+  const preferred = ['Samantha', 'Alex', 'Daniel', 'Karen', 'Moira', 'Tessa', 'Fiona'];
+  const en = voices.filter(v => v.locale.startsWith('en'));
+  en.sort((a, b) => {
+    const ia = preferred.indexOf(a.name), ib = preferred.indexOf(b.name);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.name.localeCompare(b.name);
+  });
+  voiceEl.innerHTML = '';
+  (en.length ? en : voices).forEach(v => {
+    const o = document.createElement('option');
+    o.value = v.name; o.textContent = `${v.name} (${v.locale})`;
+    voiceEl.appendChild(o);
+  });
+}
+
+async function loadFiles(dir) {
+  const q = dir != null ? '?dir=' + encodeURIComponent(dir) : '';
+  const data = await (await fetch('/api/files' + q)).json();
+  files = data.files;
+  currentDir = data.dir;
+  // Reflect the active folder in the URL so refreshes and editor round-trips keep it.
+  history.replaceState(null, '', '/?dir=' + encodeURIComponent(data.dir));
+  document.getElementById('curDir').textContent = data.dir;
+  document.getElementById('outdir').textContent = files.length
+    ? 'Output folder → ' + data.outDir
+    : 'No MP3s in this folder — pick another with “Change folder…”.';
+  render();
+}
+
+function render() {
+  rowsEl.innerHTML = '';
+  files.forEach((f, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="colsel"><input type="checkbox" class="chk row-chk" data-i="${i}" ${f.done ? '' : 'checked'} /></td>
+      <td><span class="fname">${f.filename}</span><br>
+        <a class="editlink" href="/editor.html?dir=${encodeURIComponent(currentDir)}&file=${encodeURIComponent(f.filename)}">✂️ edit ads</a>
+        ${f.adCount ? `<span class="admark">• ${f.adCount} ad${f.adCount === 1 ? '' : 's'} (${f.adSeconds}s)</span>` : ''}
+      </td>
+      <td><input class="say-input" data-i="${i}" value="${escapeHtml(f.defaultText)}" /></td>
+      <td><span class="status ${f.done ? 'done' : ''}" id="st-${i}">${f.done ? '<span class="badge">exported</span>' : ''}</span></td>
+    `;
+    rowsEl.appendChild(tr);
+  });
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+document.getElementById('selAll').onclick = () =>
+  document.querySelectorAll('.row-chk').forEach(c => c.checked = true);
+document.getElementById('selNone').onclick = () =>
+  document.querySelectorAll('.row-chk').forEach(c => c.checked = false);
+document.getElementById('masterChk').onclick = (e) =>
+  document.querySelectorAll('.row-chk').forEach(c => c.checked = e.target.checked);
+
+document.getElementById('processBtn').onclick = async () => {
+  const btn = document.getElementById('processBtn');
+  const checks = [...document.querySelectorAll('.row-chk')].filter(c => c.checked);
+  if (!checks.length) { alert('Select at least one episode.'); return; }
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+
+  let done = 0;
+  for (const c of checks) {
+    const i = +c.dataset.i;
+    const f = files[i];
+    const text = document.querySelector(`.say-input[data-i="${i}"]`).value;
+    const st = document.getElementById('st-' + i);
+    st.className = 'status busy'; st.textContent = f.adCount ? '⏳ cutting ads + labeling…' : '⏳ labeling…';
+    btn.textContent = `Working ${++done}/${checks.length}…`;
+    try {
+      const r = await (await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dir: currentDir, filename: f.filename, text, voice: voiceEl.value, rate: +rateEl.value }),
+      })).json();
+      if (!r.ok) throw new Error(r.error || 'failed');
+      st.className = 'status done';
+      st.innerHTML = '<span class="badge">exported</span>' +
+        (r.adCount ? ` <span class="admark">−${r.adSeconds}s ads</span>` : '');
+      f.done = true;
+    } catch (err) {
+      st.className = 'status err'; st.textContent = '✗ ' + err.message;
+    }
+  }
+  btn.textContent = origLabel;
+  btn.disabled = false;
+};
+
+// ---- folder browser --------------------------------------------------------
+const modal = document.getElementById('browseModal');
+const browseCur = document.getElementById('browseCur');
+const browseList = document.getElementById('browseList');
+const browseHint = document.getElementById('browseHint');
+let browseDirPath = '';
+
+async function openBrowse() {
+  browseDirPath = currentDir;
+  modal.classList.add('open');
+  await renderBrowse(currentDir);
+}
+
+async function renderBrowse(dir) {
+  browseList.innerHTML = '<div class="diritem">Loading…</div>';
+  let data;
+  try {
+    data = await (await fetch('/api/browse?dir=' + encodeURIComponent(dir))).json();
+    if (data.error) throw new Error(data.error);
+  } catch (err) {
+    browseList.innerHTML = `<div class="diritem" style="color:var(--bad)">✗ ${err.message}</div>`;
+    return;
+  }
+  browseDirPath = data.dir;
+  browseCur.textContent = data.dir;
+  browseHint.textContent = data.mp3Count
+    ? `${data.mp3Count} MP3${data.mp3Count === 1 ? '' : 's'} here`
+    : 'No MP3s directly in this folder';
+
+  const items = [];
+  if (data.parent) items.push({ name: '..', path: data.parent, ico: '⬆️', up: true });
+  data.dirs.forEach((name) => items.push({ name, path: data.dir.replace(/\/$/, '') + '/' + name, ico: '📁' }));
+
+  browseList.innerHTML = '';
+  if (!items.length) {
+    browseList.innerHTML = '<div class="diritem" style="color:var(--muted)">No sub-folders</div>';
+  }
+  items.forEach((it) => {
+    const el = document.createElement('div');
+    el.className = 'diritem';
+    el.innerHTML = `<span class="ico">${it.ico}</span><span>${escapeHtml(it.up ? 'Parent folder' : it.name)}</span>`;
+    el.onclick = () => renderBrowse(it.path);
+    browseList.appendChild(el);
+  });
+}
+
+document.getElementById('changeDir').onclick = openBrowse;
+document.getElementById('browseCancel').onclick = () => modal.classList.remove('open');
+modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('open'); };
+document.getElementById('browsePick').onclick = async () => {
+  modal.classList.remove('open');
+  await loadFiles(browseDirPath);
+};
+
+const initialDir = new URLSearchParams(location.search).get('dir');
+loadVoices().then(() => loadFiles(initialDir));
+</script>
+</body>
+</html>

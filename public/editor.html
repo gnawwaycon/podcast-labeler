@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>✂️ Ad Editor</title>
+<style>
+  :root {
+    --bg: #0e1726; --panel: #16223a; --panel2: #1d2c49; --line: #2a3c5e;
+    --text: #e6edf7; --muted: #8da2c0; --accent: #38bdf8; --good: #34d399;
+    --bad: #f87171; --ad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.45; }
+  header { padding: 18px 26px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #16223a, #0e1726); display: flex; align-items: center; gap: 16px; }
+  header a.back { color: var(--muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+  header a.back:hover { color: var(--accent); }
+  header h1 { margin: 0; font-size: 17px; }
+  header .fname { font-family: ui-monospace, monospace; color: var(--accent); font-size: 14px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 22px 26px 90px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px; margin-bottom: 16px; }
+
+  #waveform { background: var(--panel2); border-radius: 8px; padding: 6px; cursor: text; }
+  #timeline { margin-top: 2px; }
+
+  .transport { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+  .transport .time { font-family: ui-monospace, monospace; font-size: 14px; color: var(--muted); min-width: 130px; }
+  .transport .time b { color: var(--text); }
+  button { background: var(--accent); color: #04222f; border: 0; border-radius: 8px;
+    padding: 9px 15px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--line); }
+  button.danger { background: var(--bad); color: #2b0808; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  .play-btn { width: 46px; height: 46px; border-radius: 50%; font-size: 18px; padding: 0; }
+  .ctl { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+  .ctl input[type=range] { accent-color: var(--accent); }
+  .zoomgroup { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .zoomgroup button { background: var(--panel2); color: var(--text); border: 0; border-left: 1px solid var(--line);
+    border-radius: 0; padding: 7px 11px; font-size: 13px; font-weight: 600; min-width: 40px; }
+  .zoomgroup button:first-child { border-left: 0; }
+  .zoomgroup button.active { background: var(--accent); color: #04222f; }
+  .zoomgroup button:hover:not(.active) { background: var(--line); }
+  .spacer { flex: 1; }
+
+  .hint { font-size: 13px; color: var(--muted); margin: 2px 0 14px; }
+  .hint b { color: var(--text); }
+
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+    margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--muted);
+    padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  td.mono { font-family: ui-monospace, monospace; }
+  .tsInput { width: 78px; background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 8px; font-family: ui-monospace, monospace; font-size: 13px; }
+  .tsInput:focus { outline: none; border-color: var(--accent); }
+  .noregions { color: var(--muted); font-size: 14px; padding: 8px; }
+  .rowbtn { padding: 5px 10px; font-size: 12px; }
+
+  .savebar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .savebar .msg { font-size: 13px; }
+  .savebar .msg.good { color: var(--good); }
+  .savebar .msg.bad { color: var(--bad); }
+  .badge-ad { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+    background: var(--ad); opacity: .6; margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<header>
+  <a class="back" id="backLink" href="/">← Back to labeler</a>
+  <h1>✂️ Ad Editor — <span class="fname" id="fname">…</span></h1>
+</header>
+<main>
+  <p class="hint">
+    <b>Drag across the waveform</b> to mark an ad. Drag a region's edges to fine-tune, or edit the
+    <b>Start/End</b> times in the table below. Marks save automatically — then hit
+    <b>⬇︎ Export</b> back on the labeler to cut ads and add the spoken name in one step.
+  </p>
+
+  <div class="card">
+    <div id="waveform"></div>
+    <div id="timeline"></div>
+    <div class="transport">
+      <button class="play-btn" id="playBtn" title="Play / Pause (Space)">▶︎</button>
+      <button class="secondary" id="skipBack" title="Back 10s">« 10s</button>
+      <button class="secondary" id="skipFwd" title="Forward 10s">10s »</button>
+      <div class="time"><b id="cur">0:00</b> / <span id="dur">0:00</span></div>
+      <div class="spacer"></div>
+      <div class="ctl">Speed
+        <input type="range" id="speed" min="0.5" max="3" step="0.25" value="1" />
+        <span id="speedVal">1×</span>
+      </div>
+      <div class="ctl">Zoom
+        <div class="zoomgroup" id="zoomGroup">
+          <button type="button" data-px="0" class="active">Fit</button>
+          <button type="button" data-px="10">＋</button>
+          <button type="button" data-px="30">＋＋</button>
+          <button type="button" data-px="90">＋＋＋</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Marked ads (<span id="rcount">0</span>)</h2>
+    <table id="regionTable">
+      <thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th><th></th></tr></thead>
+      <tbody id="regionRows"></tbody>
+    </table>
+    <div class="noregions" id="noRegions">No ads marked yet — drag across the waveform above.</div>
+  </div>
+
+  <div class="card savebar">
+    <a id="doneLink" href="/"><button>✓ Done — back to labeler</button></a>
+    <button class="secondary" id="clearBtn">Clear all marks</button>
+    <span class="msg" id="saveMsg"></span>
+  </div>
+</main>
+
+<script type="module">
+import WaveSurfer from './vendor/wavesurfer.esm.js';
+import RegionsPlugin from './vendor/regions.esm.js';
+
+const params = new URLSearchParams(location.search);
+const dir = params.get('dir') || '';
+const file = params.get('file') || '';
+document.getElementById('fname').textContent = file;
+document.title = '✂️ ' + file;
+
+// Keep the labeler on the same folder when going back.
+const backHref = dir ? '/?dir=' + encodeURIComponent(dir) : '/';
+document.getElementById('backLink').href = backHref;
+document.getElementById('doneLink').href = backHref;
+
+const audioUrl = '/api/audio?dir=' + encodeURIComponent(dir) + '&file=' + encodeURIComponent(file);
+
+const regions = RegionsPlugin.create();
+const ws = WaveSurfer.create({
+  container: '#waveform',
+  height: 140,
+  waveColor: '#4b6a9b',
+  progressColor: '#38bdf8',
+  cursorColor: '#e6edf7',
+  url: audioUrl,
+  minPxPerSec: 0,
+  plugins: [regions],
+});
+
+const AD_COLOR = 'rgba(248, 113, 113, 0.28)';
+// Exposed for quick scripting/automation (local tool).
+window.ws = ws; window.adRegions = regions;
+
+function fmt(s) {
+  if (!isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ':' + String(sec).padStart(2, '0');
+}
+
+let loading = true;  // suppress auto-save while we restore saved marks
+
+ws.on('ready', async () => {
+  document.getElementById('dur').textContent = fmt(ws.getDuration());
+  regions.enableDragSelection({ color: AD_COLOR });
+  // Restore previously-marked ads for this episode.
+  try {
+    const { regions: saved } = await (await fetch(
+      '/api/regions?dir=' + encodeURIComponent(dir) + '&file=' + encodeURIComponent(file))).json();
+    (saved || []).forEach((r) => regions.addRegion({ start: r.start, end: r.end, color: AD_COLOR }));
+  } catch {}
+  loading = false;
+  renderRegions();
+});
+ws.on('timeupdate', (t) => { document.getElementById('cur').textContent = fmt(t); });
+ws.on('play', () => (playBtn.textContent = '❚❚'));
+ws.on('pause', () => (playBtn.textContent = '▶︎'));
+ws.on('error', (e) => {
+  document.getElementById('saveMsg').className = 'msg bad';
+  document.getElementById('saveMsg').textContent = 'Could not load audio: ' + e;
+});
+
+// keep every region styled/consistent as an "ad", and persist on any change
+regions.on('region-created', (r) => { r.setOptions({ color: AD_COLOR }); onChange(); });
+regions.on('region-updated', onChange);
+regions.on('region-removed', onChange);
+// single click inside a region plays just it
+regions.on('region-clicked', (r, e) => { e.stopPropagation(); r.play(); });
+
+function onChange() {
+  renderRegions();
+  if (!loading) autosave();
+}
+
+// ---- persistence ------------------------------------------------------------
+let saveTimer = null;
+function autosave() {
+  const msg = document.getElementById('saveMsg');
+  msg.className = 'msg'; msg.textContent = 'saving…';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const body = JSON.stringify({
+        dir, file, regions: sortedRegions().map((r) => ({ start: r.start, end: r.end })),
+      });
+      const r = await (await fetch('/api/regions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+      })).json();
+      if (!r.ok) throw new Error(r.error || 'save failed');
+      msg.className = 'msg good'; msg.textContent = '✓ marks saved';
+    } catch (err) {
+      msg.className = 'msg bad'; msg.textContent = '✗ ' + err.message;
+    }
+  }, 400);
+}
+
+// Parse "m:ss", "m:ss.s", or plain seconds into a number of seconds.
+function parseTime(str) {
+  str = String(str).trim();
+  if (/^\d+(\.\d+)?$/.test(str)) return parseFloat(str);
+  const m = str.match(/^(\d+):([0-5]?\d(?:\.\d+)?)$/);
+  return m ? (+m[1]) * 60 + parseFloat(m[2]) : NaN;
+}
+
+function sortedRegions() {
+  return regions.getRegions().slice().sort((a, b) => a.start - b.start);
+}
+
+function renderRegions() {
+  const list = sortedRegions();
+  const rows = document.getElementById('regionRows');
+  const noR = document.getElementById('noRegions');
+  document.getElementById('rcount').textContent = list.length;
+  rows.innerHTML = '';
+  noR.style.display = list.length ? 'none' : 'block';
+  list.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="badge-ad"></span>${i + 1}</td>
+      <td><input class="tsInput start" value="${fmt(r.start)}" /></td>
+      <td><input class="tsInput end" value="${fmt(r.end)}" /></td>
+      <td class="mono">${fmt(r.end - r.start)}</td>
+      <td style="text-align:right; white-space:nowrap">
+        <button class="secondary rowbtn play">▶ play</button>
+        <button class="danger rowbtn del">× remove</button>
+      </td>`;
+    const dur = ws.getDuration();
+    const commit = (which, input) => {
+      const t = parseTime(input.value);
+      if (!isFinite(t)) { input.value = fmt(which === 'start' ? r.start : r.end); return; }
+      if (which === 'start') r.setOptions({ start: Math.min(Math.max(0, t), r.end - 0.1), end: r.end });
+      else r.setOptions({ start: r.start, end: Math.max(Math.min(dur, t), r.start + 0.1) });
+      onChange(); // setOptions doesn't emit region-updated, so refresh + save here
+    };
+    const sIn = tr.querySelector('.start'), eIn = tr.querySelector('.end');
+    sIn.onchange = () => commit('start', sIn);
+    eIn.onchange = () => commit('end', eIn);
+    tr.querySelector('.play').onclick = () => r.play();
+    tr.querySelector('.del').onclick = () => r.remove();
+    rows.appendChild(tr);
+  });
+}
+
+// ---- transport --------------------------------------------------------------
+const playBtn = document.getElementById('playBtn');
+playBtn.onclick = () => ws.playPause();
+document.getElementById('skipBack').onclick = () => ws.setTime(Math.max(0, ws.getCurrentTime() - 10));
+document.getElementById('skipFwd').onclick = () => ws.setTime(Math.min(ws.getDuration(), ws.getCurrentTime() + 10));
+
+const speed = document.getElementById('speed');
+speed.oninput = () => {
+  ws.setPlaybackRate(+speed.value);
+  document.getElementById('speedVal').textContent = (+speed.value) + '×';
+};
+// Discrete zoom levels (px per second). 0 = fit whole track to the container.
+const zoomGroup = document.getElementById('zoomGroup');
+function applyZoom(px) {
+  const val = px > 0
+    ? px
+    : Math.max(1, (document.getElementById('waveform').clientWidth - 12) / (ws.getDuration() || 1));
+  ws.zoom(val);
+}
+zoomGroup.querySelectorAll('button').forEach((b) => {
+  b.onclick = () => {
+    zoomGroup.querySelectorAll('button').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    applyZoom(+b.dataset.px);
+  };
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+    e.preventDefault(); ws.playPause();
+  }
+});
+
+document.getElementById('clearBtn').onclick = () => regions.clearRegions();
+</script>
+</body>
+</html>

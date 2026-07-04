@@ -1,0 +1,17 @@
+{
+  "name": "podcast-labeler",
+  "version": "1.0.0",
+  "description": "Local web app to prepend a spoken episode name to podcast MP3s and cut out ads — so you can tell episodes apart on a screenless MP3 player (e.g. while swimming).",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "bin": {
+    "podcast-labeler": "server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
