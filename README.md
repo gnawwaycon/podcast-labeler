@@ -9,6 +9,16 @@ Both happen in **one export**: pick episodes, optionally mark ads, hit **Export*
 
 ![status: personal project](https://img.shields.io/badge/status-personal%20project-blue)
 
+## Screenshots
+
+**Labeler** — pick a folder, edit the spoken name per episode, and export (ads are cut and the name is prepended in one step):
+
+![The labeler: a list of episodes with editable spoken-announcement text and an Export button](docs/labeler.png)
+
+**Ad editor** — play the audio, drag across the waveform to mark ads, fine-tune with editable timestamps, then export:
+
+![The ad editor: an audio waveform with two ad regions highlighted and a table of editable start/end times](docs/editor.png)
+
 ## Requirements
 
 - **macOS** — uses the built-in `say` command for text-to-speech.
