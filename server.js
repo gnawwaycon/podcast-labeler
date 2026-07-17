@@ -36,24 +36,45 @@ function run(cmd, args, opts = {}) {
   });
 }
 
-function listMp3s(dir) {
+// Spoken-friendly duration, e.g. "29 minutes", "1 minute", "45 seconds".
+function formatSpokenLength(seconds) {
+  const s = Math.round(seconds);
+  if (s < 60) return `${s} second${s === 1 ? '' : 's'}`;
+  const m = Math.round(s / 60);
+  return `${m} minute${m === 1 ? '' : 's'}`;
+}
+
+// Default spoken announcement for an episode: title, then its length.
+function announcementFor(filename, seconds) {
+  const title = humanize(filename.replace(/\.mp3$/i, ''));
+  return seconds && isFinite(seconds) ? `${title}, ${formatSpokenLength(seconds)}` : title;
+}
+
+async function listMp3s(dir) {
   const outDir = outDirFor(dir);
   const marks = loadRegions(dir);
-  return fs
+  const names = fs
     .readdirSync(dir)
     .filter((f) => f.toLowerCase().endsWith('.mp3'))
-    .sort((a, b) => a.localeCompare(b))
-    .map((f) => {
+    .sort((a, b) => a.localeCompare(b));
+  return Promise.all(
+    names.map(async (f) => {
       const rs = marks[f] || [];
       const adSeconds = rs.reduce((s, r) => s + Math.max(0, r.end - r.start), 0);
+      let dur = 0;
+      try {
+        dur = await probeDuration(path.join(dir, f));
+      } catch {}
       return {
         filename: f,
-        defaultText: humanize(f.replace(/\.mp3$/i, '')),
+        defaultText: announcementFor(f, dur),
+        durationSec: Math.round(dur),
         done: fs.existsSync(path.join(outDir, f)),
         adCount: rs.length,
         adSeconds: Math.round(adSeconds),
       };
-    });
+    })
+  );
 }
 
 // ---- ad-region persistence --------------------------------------------------
@@ -203,7 +224,16 @@ async function exportFinal({ dir, filename, text, voice, rate }) {
     const sayArgs = ['-o', aiff];
     if (voice) sayArgs.push('-v', voice);
     if (rate) sayArgs.push('-r', String(rate));
-    sayArgs.push('--', text && text.trim() ? text : humanize(filename.replace(/\.mp3$/i, '')));
+    // Fall back to "title, length" if the caller sent no custom text.
+    let spoken = text && text.trim();
+    if (!spoken) {
+      let d = 0;
+      try {
+        d = await probeDuration(input);
+      } catch {}
+      spoken = announcementFor(filename, d);
+    }
+    sayArgs.push('--', spoken);
     await run('say', sayArgs);
     await run('ffmpeg', [
       '-y', '-i', aiff,
@@ -328,7 +358,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && url.pathname === '/api/files') {
       const dir = resolveDir(url.searchParams.get('dir'));
-      return sendJson(res, 200, { dir, files: listMp3s(dir), outDir: outDirFor(dir) });
+      return sendJson(res, 200, { dir, files: await listMp3s(dir), outDir: outDirFor(dir) });
     }
 
     if (req.method === 'GET' && url.pathname === '/api/browse') {
